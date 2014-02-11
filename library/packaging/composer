@@ -1,0 +1,27 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+def self_update(module, composer_path):
+    """ Updates packages list. """
+
+    rc, out, err = module.run_command("%s update" % composer_path)
+
+    if rc != 0:
+        module.fail_json(msg=err)
+
+def main():
+    module = AnsibleModule(
+        argument_spec = dict(
+            working_dir = dict(aliases=["working-dir"], required=True),
+        ),
+        supports_check_mode=True
+    )
+
+    composer_path = module.get_bin_path("composer", True, ["/tmp"])
+
+    p = module.params
+
+# import module snippets
+from ansible.module_utils.basic import *
+
+main()
