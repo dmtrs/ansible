@@ -4,7 +4,7 @@
 def self_update(module, composer_path):
     """ Updates packages list. """
 
-    rc, out, err = module.run_command("%s update" % composer_path)
+    rc, out, err = module.run_command("%s %s" % (composer_path, command))
 
     if rc != 0:
         module.fail_json(msg=err)
@@ -12,14 +12,21 @@ def self_update(module, composer_path):
 def main():
     module = AnsibleModule(
         argument_spec = dict(
+            command     = dict(default="install", choices=["install", "update", "require"]),
             working_dir = dict(aliases=["working-dir"], required=True),
+            package     = dict(required=False),
+            version     = dict(default="dev-master", required=False),
         ),
         supports_check_mode=True
     )
 
-    composer_path = module.get_bin_path("composer", True, ["/tmp"])
-
+    composer_path = module.get_bin_path("composer", True, ["/usr/local/bin"])
+    
     p = module.params
+
+    rc, out, err = module.run_command("%s %s %s:%s --working-dir=%" % (composer_path, p["command"], p["package"], p["version"], p["working_dir"]))
+    module.exit_json(changed=True, out='test')
+
 
 # import module snippets
 from ansible.module_utils.basic import *
