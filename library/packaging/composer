@@ -3,8 +3,9 @@
 import pprint
 
 def composer_exec(module, command, options):
+    php_path      = module.get_bin_path("php", True, ["/usr/local/bin"])
     composer_path = module.get_bin_path("composer", True, ["/usr/local/bin"])
-    cmd           = "%s %s %s" % (composer_path, command, options)
+    cmd           = "%s %s %s %s" % (php_path, composer_path, command, options)
 
     rc, out, err  = module.run_command(cmd)
 
