@@ -1,32 +1,69 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+import pprint
 
-def self_update(module, composer_path):
-    """ Updates packages list. """
+def composer_exec(module, command, options):
+    composer_path = module.get_bin_path("composer", True, ["/usr/local/bin"])
+    cmd           = "%s %s %s" % (composer_path, command, options)
 
-    rc, out, err = module.run_command("%s %s" % (composer_path, command))
+    rc, out, err  = module.run_command(cmd)
 
     if rc != 0:
-        module.fail_json(msg=err)
+        module.fail_json(msg=err, cmd=cmd)
+    else:
+        module.exit_json(changed=True, msg=out, cmd=cmd)
 
 def main():
     module = AnsibleModule(
         argument_spec = dict(
-            command     = dict(default="install", choices=["install", "update", "require"]),
-            working_dir = dict(aliases=["working-dir"], required=True),
-            package     = dict(required=False),
-            version     = dict(default="dev-master", required=False),
+            # Ansible module specific options
+            command             = dict(default="install", choices=["install", "update"]),
+            # Global options
+            profile             = dict(default="no", type="bool"),
+            working_dir         = dict(aliases=["working-dir"], required=True),
+            # Install/Update options
+            prefer_source       = dict(default="no", type="bool", aliases=[ "prefer-source" ]),
+            prefer_dist         = dict(default="no", type="bool", aliases=[ "prefer-dist" ]),
+            dry_run             = dict(default="no", type="bool", aliases=[ "dry-run" ]),
+            no_dev              = dict(default="no", type="bool", aliases=[ "no-dev" ]),
+            no_scripts          = dict(default="no", type="bool", aliases=[ "no-scripts" ]),
+            no_plugins          = dict(default="no", type="bool", aliases=[ "no-plugins" ]),
+            no_progress         = dict(default="no", type="bool", aliases=[ "no-progress" ]), # hardcode
+            optimize_autoloader = dict(default="no", type="bool", aliases=[ "optimize-autoloader" ]),
+            # Update specific options
+            lock                = dict(default="no", type="bool"),
+            with_dependencies   = dict(default="no", type="bool", aliases=[ "with-dependencies" ]),
+            packages            = dict(default=None, type="list")
         ),
         supports_check_mode=True
     )
 
-    composer_path = module.get_bin_path("composer", True, ["/usr/local/bin"])
-    
-    p = module.params
+    command = module.params["command"]
+    params  = module.params
+    del params["command"]
 
-    rc, out, err = module.run_command("%s %s %s:%s --working-dir=%" % (composer_path, p["command"], p["package"], p["version"], p["working_dir"]))
-    module.exit_json(changed=True, out='test')
+    packages=[]
+    if command=="install":
+        del params["lock"]
+        del params["with_dependencies"]
+    else:
+        if params["packages"] is not None:
+            packages=params["packages"]
 
+    del params["packages"]
+
+    options = set([])
+    for i in params:
+        if isinstance(params[i], (bool)) and params[i]:
+            options.add("--%s" % i.replace("_","-"))
+        elif isinstance(params[i], (str)):
+            options.add("--%s=%s" % (i.replace("_","-"), params[i]))
+
+    options.add("--no-ansi")
+
+    opts  = " ".join(options)
+    pckgs = " ".join(packages) if len(packages) > 0 else ""
+    composer_exec(module, command, "%s %s" % (opts, pckgs))
 
 # import module snippets
 from ansible.module_utils.basic import *
