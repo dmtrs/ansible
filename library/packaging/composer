@@ -1,18 +1,22 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-import pprint
+import json
+
+def read_lock(module):
+    try:
+        with open("%s/composer.lock" % module.params["working_dir"]) as composer_lock:
+            data = json.load(composer_lock)
+            return data["hash"]
+    except IOError:
+        return None
+
 
 def composer_exec(module, command, options):
     php_path      = module.get_bin_path("php", True, ["/usr/local/bin"])
     composer_path = module.get_bin_path("composer", True, ["/usr/local/bin"])
     cmd           = "%s %s %s %s" % (php_path, composer_path, command, options)
 
-    rc, out, err  = module.run_command(cmd)
-
-    if rc != 0:
-        module.fail_json(msg=err, cmd=cmd)
-    else:
-        module.exit_json(changed=True, msg=out, cmd=cmd)
+    return module.run_command(cmd)
 
 def main():
     module = AnsibleModule(
@@ -60,11 +64,19 @@ def main():
         elif isinstance(params[i], (str)):
             options.add("--%s=%s" % (i.replace("_","-"), params[i]))
 
+    before_lock = read_lock(module)
     options.add("--no-ansi")
 
     opts  = " ".join(options)
     pckgs = " ".join(packages) if len(packages) > 0 else ""
-    composer_exec(module, command, "%s %s" % (opts, pckgs))
+
+    rc, out, err = composer_exec(module, command, "%s %s" % (opts, pckgs))
+
+    if rc != 0:
+        module.fail_json(msg=err, cmd=cmd)
+    else:
+        after_lock = read_lock(module)
+        module.exit_json(changed=(before_lock!=after_lock), before_lock=before_lock, after_lock=after_lock)
 
 # import module snippets
 from ansible.module_utils.basic import *
