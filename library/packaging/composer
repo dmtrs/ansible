@@ -1,5 +1,109 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+
+# (c) 2014, Dimitrios Tydeas Mengidis <tydeas.dr@gmail.com>
+#
+DOCUMENTATION = '''
+---
+module: composer
+author: dmtrs
+short_description: Dependency Manager for PHP
+description:
+    - Composer is a tool for dependency management in PHP. It allows you to declare the dependent libraries your project needs and it will install them in your project for you.
+version_added: "1.4"
+requirements: [ "php", "composer" ]
+options:
+    command:
+        description:
+            - Composer command to execute
+        required: true
+        default: "install"
+        choices: [ "install", "update" ]
+    working_dir:
+        description:
+            - Directory of your project. composer option --working-dir
+        required: true
+        default: null
+        aliases: [ "working-dir" ]
+    prefer_source:
+        description:
+            - Forces installation from package sources when possible. composer option --prefer-source
+        required: false
+        default: "no"
+        choices: [ "yes", "no" ]
+        aliases: [ "prefer-source" ]
+    prefer_dist:
+        description:
+            - Forces installation from package dist even for de versions. composer option --prefer-dist
+        required: false
+        default: "no"
+        choices: [ "yes", "no" ]
+        aliases: [ "prefer-dist" ]
+    no_dev:
+        description:
+            - Disables installation of require-dev packages. composer option --no-dev
+        required: false
+        default: "no"
+        choices: [ "yes", "no" ]
+        aliases: [ "no-dev" ]
+    no_scripts:
+        description:
+            - Skips the execution of all scripts defined in composer.json. compsoer option --no-scripts
+        required: false
+        default: "no"
+        choices: [ "yes", "no" ]
+        aliases: [ "no-scripts" ]
+    no_plugins:
+        description:
+            - Disables all plugins. composer option: --no-plugins
+        required: false
+        default: "no"
+        choices: [ "yes", "no" ]
+        aliases: [ "no-plugins" ]
+    optimize_autoloader:
+        description:
+            - Optimize autoloader during autoloader dump. composer option --optimize-autoloader
+        required: false
+        default: "no"
+        choices: [ "yes", "no" ]
+        aliases: [ "optimize-autoloader" ]
+        notes: [ "Convert PSR-0/4 autoloading to classmap to get a faster autoloader.", "This is recommended especially for production, but can take a bit of time to run so it is currently not done by default." ]
+    lock:
+        description:
+            - Optimize autoloader during autoloader dump. composer option --optimize-autoloader
+        required: false
+        default: "no"
+        choices: [ "yes", "no" ]
+        aliases: [ "optimize-autoloader" ]
+        notes: [ "Used only for 'update' command" ]
+    with_dependencies:
+        description:
+            - Add also all dependencies of whitelisted packages to the whitelist. composer option --with-dependencies
+        required: false
+        default: "no"
+        choices: [ "yes", "no" ]
+        aliases: [ "with-dependencies" ]
+        notes: [ "Used only for 'update' command" ]
+    packages:
+        description:
+            -  Comma seperated string with names of packages that should be updated, if not provided all packages are. composer 
+        required: false
+        default: null
+        notes: [ "Used only for 'update' command" ]
+notes: []
+'''
+
+EXAMPLES = '''
+# Downloads and installs all the libs and dependencies outlined in the /path/to/project/composer.json
+- composer: command=install working_dir=/path/to/project
+
+# Updates, removed or installs all the dependecies instructed from /path/to/project/composer.json
+- composer: command=update working_dir=/path/to/project
+
+# Updates packages to the listed ones
+- composer: command=update working_dir=/path/to/project packages=vendor/lib1,vendor/lib2
+'''
+
 import os
 
 def read_lock(module):
@@ -24,28 +128,26 @@ def main():
             # Ansible module specific options
             command             = dict(default="install", choices=["install", "update"]),
             # Global options
-            profile             = dict(default="no", type="bool"),
             working_dir         = dict(aliases=["working-dir"], required=True),
             # Install/Update options
             prefer_source       = dict(default="no", type="bool", aliases=[ "prefer-source" ]),
             prefer_dist         = dict(default="no", type="bool", aliases=[ "prefer-dist" ]),
-            dry_run             = dict(default="no", type="bool", aliases=[ "dry-run" ]),
             no_dev              = dict(default="no", type="bool", aliases=[ "no-dev" ]),
             no_scripts          = dict(default="no", type="bool", aliases=[ "no-scripts" ]),
             no_plugins          = dict(default="no", type="bool", aliases=[ "no-plugins" ]),
-            no_progress         = dict(default="no", type="bool", aliases=[ "no-progress" ]), # hardcode
             optimize_autoloader = dict(default="no", type="bool", aliases=[ "optimize-autoloader" ]),
             # Update specific options
             lock                = dict(default="no", type="bool"),
             with_dependencies   = dict(default="no", type="bool", aliases=[ "with-dependencies" ]),
             packages            = dict(default=None, type="list")
-        ),
-        supports_check_mode=True
+        )
     )
 
     command = module.params["command"]
     params  = module.params
+
     del params["command"]
+    params["working_dir"] = os.path.abspath(params["working_dir"])
 
     packages=[]
     if command=="install":
@@ -66,6 +168,7 @@ def main():
 
     before_lock = read_lock(module)
     options.add("--no-ansi")
+    options.add("--no-progress")
 
     opts  = " ".join(options)
     pckgs = " ".join(packages) if len(packages) > 0 else ""
@@ -73,7 +176,7 @@ def main():
     rc, out, err = composer_exec(module, command, "%s %s" % (opts, pckgs))
 
     if rc != 0:
-        module.fail_json(msg=err, cmd=cmd)
+        module.fail_json(msg=err, cmd=out)
     else:
         after_lock = read_lock(module)
         module.exit_json(changed=(before_lock!=after_lock), before_lock=before_lock, after_lock=after_lock)
