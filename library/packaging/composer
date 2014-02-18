@@ -1,11 +1,11 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-import json
+import os
 
 def read_lock(module):
     try:
-        with open("%s/composer.lock" % module.params["working_dir"]) as composer_lock:
-            data = json.load(composer_lock)
+        with open(os.path.abspath("%s/composer.lock" % module.params["working_dir"])) as composer_lock:
+            data = module.from_json(composer_lock.read())
             return data["hash"]
     except IOError:
         return None
