@@ -6,12 +6,11 @@
 DOCUMENTATION = '''
 ---
 module: composer
-author: dmtrs
+author: Dimitrios Tydeas Mengidis
 short_description: Dependency Manager for PHP
-description:
-    - Composer is a tool for dependency management in PHP. It allows you to declare the dependent libraries your project needs and it will install them in your project for you.
 version_added: "1.4"
-requirements: [ "php", "composer" ]
+description:
+    - Composer is a tool for dependency management in PHP. It allows you to declare the dependent libraries your project needs and it will install them in your project for you
 options:
     command:
         description:
@@ -21,76 +20,76 @@ options:
         choices: [ "install", "update" ]
     working_dir:
         description:
-            - Directory of your project. composer option --working-dir
+            - Directory of your project ( see --working-dir )
         required: true
         default: null
         aliases: [ "working-dir" ]
     prefer_source:
         description:
-            - Forces installation from package sources when possible. composer option --prefer-source
+            - Forces installation from package sources when possible ( see --prefer-source )
         required: false
         default: "no"
         choices: [ "yes", "no" ]
         aliases: [ "prefer-source" ]
     prefer_dist:
         description:
-            - Forces installation from package dist even for de versions. composer option --prefer-dist
+            - Forces installation from package dist even for de versions ( see --prefer-dist )
         required: false
         default: "no"
         choices: [ "yes", "no" ]
         aliases: [ "prefer-dist" ]
     no_dev:
         description:
-            - Disables installation of require-dev packages. composer option --no-dev
+            - Disables installation of require-dev packages ( see --no-dev )
         required: false
         default: "no"
         choices: [ "yes", "no" ]
         aliases: [ "no-dev" ]
     no_scripts:
         description:
-            - Skips the execution of all scripts defined in composer.json. compsoer option --no-scripts
+            - Skips the execution of all scripts defined in composer.json ( see --no-scripts )
         required: false
         default: "no"
         choices: [ "yes", "no" ]
         aliases: [ "no-scripts" ]
     no_plugins:
         description:
-            - Disables all plugins. composer option: --no-plugins
+            - Disables all plugins ( see --no-plugins )
         required: false
         default: "no"
         choices: [ "yes", "no" ]
         aliases: [ "no-plugins" ]
     optimize_autoloader:
         description:
-            - Optimize autoloader during autoloader dump. composer option --optimize-autoloader
+            - Optimize autoloader during autoloader dump ( see --optimize-autoloader ). Convert PSR-0/4 autoloading to classmap to get a faster autoloader. This is recommended especially for production, but can take a bit of time to run so it is currently not done by default.
         required: false
         default: "no"
         choices: [ "yes", "no" ]
         aliases: [ "optimize-autoloader" ]
-        notes: [ "Convert PSR-0/4 autoloading to classmap to get a faster autoloader.", "This is recommended especially for production, but can take a bit of time to run so it is currently not done by default." ]
     lock:
         description:
-            - Optimize autoloader during autoloader dump. composer option --optimize-autoloader
+            - Only updates the lock file hash to suppress warning about the lock file being out of date ( see --lock ). Note: used only for 'update' command
         required: false
         default: "no"
         choices: [ "yes", "no" ]
         aliases: [ "optimize-autoloader" ]
-        notes: [ "Used only for 'update' command" ]
     with_dependencies:
         description:
-            - Add also all dependencies of whitelisted packages to the whitelist. composer option --with-dependencies
+            - Add also all dependencies of whitelisted packages to the whitelist ( see --with-dependencies ). Note: used only for 'update' command
         required: false
         default: "no"
         choices: [ "yes", "no" ]
         aliases: [ "with-dependencies" ]
-        notes: [ "Used only for 'update' command" ]
     packages:
         description:
-            -  Comma seperated string with names of packages that should be updated, if not provided all packages are. composer 
+            - Comma seperated string with names of packages that should be updated, if not provided all packages are. Note: used only for 'update' command
         required: false
         default: null
-        notes: [ "Used only for 'update' command" ]
-notes: []
+requirements:
+    - php
+    - composer installed in bin path (recommended /usr/local/bin)
+notes:
+    - Default options that are always appended in each execution are --no-ansi, --no-progress, and --no-interaction
 '''
 
 EXAMPLES = '''
@@ -105,6 +104,10 @@ EXAMPLES = '''
 '''
 
 import os
+import re
+
+def parse_out(string):
+    return re.sub("\s+", " ", string).strip()
 
 def read_lock(module):
     try:
@@ -130,15 +133,15 @@ def main():
             # Global options
             working_dir         = dict(aliases=["working-dir"], required=True),
             # Install/Update options
-            prefer_source       = dict(default="no", type="bool", aliases=[ "prefer-source" ]),
-            prefer_dist         = dict(default="no", type="bool", aliases=[ "prefer-dist" ]),
-            no_dev              = dict(default="no", type="bool", aliases=[ "no-dev" ]),
-            no_scripts          = dict(default="no", type="bool", aliases=[ "no-scripts" ]),
-            no_plugins          = dict(default="no", type="bool", aliases=[ "no-plugins" ]),
-            optimize_autoloader = dict(default="no", type="bool", aliases=[ "optimize-autoloader" ]),
+            prefer_source       = dict(default="no", type="bool", aliases=["prefer-source"]),
+            prefer_dist         = dict(default="no", type="bool", aliases=["prefer-dist"]),
+            no_dev              = dict(default="no", type="bool", aliases=["no-dev"]),
+            no_scripts          = dict(default="no", type="bool", aliases=["no-scripts"]),
+            no_plugins          = dict(default="no", type="bool", aliases=["no-plugins"]),
+            optimize_autoloader = dict(default="no", type="bool", aliases=["optimize-autoloader"]),
             # Update specific options
             lock                = dict(default="no", type="bool"),
-            with_dependencies   = dict(default="no", type="bool", aliases=[ "with-dependencies" ]),
+            with_dependencies   = dict(default="no", type="bool", aliases=["with-dependencies"]),
             packages            = dict(default=None, type="list")
         )
     )
@@ -166,20 +169,22 @@ def main():
         elif isinstance(params[i], (str)):
             options.add("--%s=%s" % (i.replace("_","-"), params[i]))
 
-    before_lock = read_lock(module)
+    # Default options
     options.add("--no-ansi")
     options.add("--no-progress")
+    options.add("--no-interaction")
 
     opts  = " ".join(options)
     pckgs = " ".join(packages) if len(packages) > 0 else ""
 
+    before_lock = read_lock(module)
     rc, out, err = composer_exec(module, command, "%s %s" % (opts, pckgs))
 
     if rc != 0:
-        module.fail_json(msg=err, cmd=out)
+        module.fail_json(msg=parse_out(err))
     else:
         after_lock = read_lock(module)
-        module.exit_json(changed=(before_lock!=after_lock), before_lock=before_lock, after_lock=after_lock)
+        module.exit_json(changed=(before_lock!=after_lock), before_lock=before_lock, after_lock=after_lock, msg=parse_out(out))
 
 # import module snippets
 from ansible.module_utils.basic import *
